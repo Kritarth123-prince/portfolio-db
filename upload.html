@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Combined File Upload Progress</title>
+    <style>
+        #progressContainer {
+            width: 100%;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            height: 20px;
+            margin-top: 10px;
+        }
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+        }
+        #status {
+            margin-top: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h2>Upload Multiple Files (Combined Progress)</h2>
+
+    <input type="file" id="fileInput" multiple><br><br>
+    <button onclick="uploadAllFiles()">Upload</button>
+
+    <div id="progressContainer">
+        <div id="progressBar">0%</div>
+    </div>
+
+    <div id="status"></div>
+
+    <script>
+        async function uploadAllFiles() {
+            const files = Array.from(document.getElementById('fileInput').files);
+            const status = document.getElementById('status');
+            const progressBar = document.getElementById('progressBar');
+
+            if (files.length === 0) {
+                status.innerText = "❌ No files selected.";
+                return;
+            }
+
+            // Validate file sizes <= 20MB (20971520 bytes)
+            for (const file of files) {
+                if (file.size > 20971520) {
+                    status.innerText = `❌ File too large (max 20MB): ${file.name}`;
+                    return;
+                }
+            }
+
+            const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+            let totalUploaded = 0;
+
+            progressBar.style.width = '0%';
+            progressBar.innerText = '0%';
+            progressBar.style.backgroundColor = '#4CAF50';
+            status.innerText = 'Uploading...';
+
+            const MAX_CONCURRENT = 5;
+            let index = 0;
+            const activeUploads = [];
+
+            function updateProgress(loaded) {
+                totalUploaded += loaded;
+                const percent = Math.round((totalUploaded / totalSize) * 100);
+                progressBar.style.width = percent + '%';
+                progressBar.innerText = percent + '%';
+            }
+
+            function uploadFile(file) {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    let prevLoaded = 0;
+
+                    xhr.upload.onprogress = (event) => {
+                        if (event.lengthComputable) {
+                            const chunkLoaded = event.loaded - prevLoaded;
+                            prevLoaded = event.loaded;
+                            updateProgress(chunkLoaded);
+                        }
+                    };
+
+                    xhr.onload = () => {
+                        if (xhr.status === 200) resolve();
+                        else reject(`Failed to upload ${file.name}`);
+                    };
+
+                    xhr.onerror = () => reject(`Network error on ${file.name}`);
+
+                    xhr.open('POST', 'upload.php', true);
+                    xhr.send(formData);
+                });
+            }
+
+            async function startNext() {
+                if (index >= files.length) return Promise.resolve();
+
+                const currentIndex = index++;
+                const file = files[currentIndex];
+                const uploadPromise = uploadFile(file).catch(e => {
+                    console.error(e);
+                    status.innerText = e;
+                });
+
+                activeUploads.push(uploadPromise);
+
+                uploadPromise.finally(() => {
+                    const pos = activeUploads.indexOf(uploadPromise);
+                    if (pos > -1) activeUploads.splice(pos, 1);
+                });
+
+                if (activeUploads.length < MAX_CONCURRENT) {
+                    return Promise.all([uploadPromise, startNext()]);
+                } else {
+                    await Promise.race(activeUploads);
+                    return startNext();
+                }
+            }
+
+            await startNext();
+            await Promise.all(activeUploads);
+
+            status.innerText = '✅ All files uploaded successfully.';
+        }
+    </script>
+</body>
+</html>
