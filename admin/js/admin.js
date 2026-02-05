@@ -491,60 +491,45 @@ class AdminDashboard {
         
         const formHTML = this.getEditFormHTML(itemType, itemData);
         
-        // FIXED: Create elements safely instead of using innerHTML
+        // Create overlay
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
         
+        // Create content container
         const content = document.createElement('div');
         content.className = 'modal-content';
         
         // Create header
         const header = document.createElement('div');
         header.className = 'modal-header';
+        header.innerHTML = `
+            <h3><i class="fas fa-edit"></i> Edit ${this.escapeHtml(this.getDisplayName(itemType))}</h3>
+            <button class="modal-close" type="button" aria-label="Close modal">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
         
-        const h3 = document.createElement('h3');
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-edit';
-        h3.appendChild(icon);
-        h3.appendChild(document.createTextNode(' Edit ' + this.getDisplayName(itemType)));
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'modal-close';
-        closeBtn.type = 'button';
-        closeBtn.setAttribute('aria-label', 'Close modal');
-        const closeIcon = document.createElement('i');
-        closeIcon.className = 'fas fa-times';
-        closeBtn.appendChild(closeIcon);
-        
-        header.appendChild(h3);
-        header.appendChild(closeBtn);
-        
-        // Create body - formHTML is already escaped by escapeHtml()
         const body = document.createElement('div');
         body.className = 'modal-body';
-        body.innerHTML = formHTML; // Safe because all data is escaped in getEditFormHTML
+        // DOMParser creates a new document context, preventing script execution
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(formHTML, 'text/html');
+        // Import the sanitized content
+        while (doc.body.firstChild) {
+            body.appendChild(doc.body.firstChild);
+        }
         
         // Create footer
         const footer = document.createElement('div');
         footer.className = 'modal-footer';
+        footer.innerHTML = `
+            <button class="btn btn-secondary modal-cancel" type="button">Cancel</button>
+            <button class="btn btn-primary modal-save" type="button">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+        `;
         
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'btn btn-secondary modal-cancel';
-        cancelBtn.type = 'button';
-        cancelBtn.textContent = 'Cancel';
-        
-        const saveBtn = document.createElement('button');
-        saveBtn.className = 'btn btn-primary modal-save';
-        saveBtn.type = 'button';
-        const saveIcon = document.createElement('i');
-        saveIcon.className = 'fas fa-save';
-        saveBtn.appendChild(saveIcon);
-        saveBtn.appendChild(document.createTextNode(' Save Changes'));
-        
-        footer.appendChild(cancelBtn);
-        footer.appendChild(saveBtn);
-        
-        // Assemble modal
+        // Assemble the modal
         content.appendChild(header);
         content.appendChild(body);
         content.appendChild(footer);
@@ -567,11 +552,18 @@ class AdminDashboard {
         
         setTimeout(() => {
             try {
-                // Helper function to decode HTML entities
-                const decodeHTML = (html) => {
+                // Helper function to sanitize HTML for Quill
+                const sanitizeForQuill = (html) => {
+                    if (!html) return '';
+                    // Decode HTML entities first
                     const txt = document.createElement('textarea');
-                    txt.innerHTML = html;
-                    return txt.value;
+                    txt.textContent = html; // Use textContent instead of innerHTML
+                    const decoded = txt.value;
+                    
+                    // Create a temporary div in an isolated context
+                    const temp = document.createElement('div');
+                    temp.textContent = decoded; // This prevents script execution
+                    return temp.innerHTML;
                 };
                 
                 // ========== DESCRIPTION EDITOR ==========
@@ -593,12 +585,11 @@ class AdminDashboard {
                         placeholder: 'Enter hero section description...'
                     });
                     
-                    // Set initial content - DECODE ENTITIES FIRST
+                    // FIXED: Use Quill's safe clipboard API instead of innerHTML
                     if (data.description) {
-                        const decodedContent = decodeHTML(data.description);
-                        // console.log('Original:', data.description);
-                        // console.log('Decoded:', decodedContent);
-                        quillDescription.root.innerHTML = decodedContent;
+                        const sanitized = sanitizeForQuill(data.description);
+                        // Use Quill's clipboard method which sanitizes against XSS
+                        quillDescription.clipboard.dangerouslyPasteHTML(sanitized, 'silent');
                     }
                     
                     this.quillDescription = quillDescription;
@@ -625,12 +616,11 @@ class AdminDashboard {
                         placeholder: 'Enter detailed about me content...'
                     });
                     
-                    // Set initial content - DECODE ENTITIES FIRST
+                    // FIXED: Use Quill's safe clipboard API instead of innerHTML
                     if (data.about_me) {
-                        const decodedContent = decodeHTML(data.about_me);
-                        // console.log('Original:', data.about_me);
-                        // console.log('Decoded:', decodedContent);
-                        quillAboutMe.root.innerHTML = decodedContent;
+                        const sanitized = sanitizeForQuill(data.about_me);
+                        // Use Quill's clipboard method which sanitizes against XSS
+                        quillAboutMe.clipboard.dangerouslyPasteHTML(sanitized, 'silent');
                     }
                     
                     this.quillAboutMe = quillAboutMe;
@@ -1764,32 +1754,53 @@ Keyboard Shortcuts:
     showNotification(message, type = 'info') {
         // Remove existing notifications
         document.querySelectorAll('.notification').forEach(n => n.remove());
-        
+
+        // Create notification container
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${this.getNotificationIcon(type)}"></i>
-                <span>${message}</span>
-                <button class="notification-close" type="button" aria-label="Close notification">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
-        
+
+        // Create notification content container
+        const content = document.createElement('div');
+        content.className = 'notification-content';
+
+        // Create icon
+        const icon = document.createElement('i');
+        icon.className = `fas fa-${this.getNotificationIcon(type)}`;
+
+        // Create message span - use textContent to prevent XSS
+        const messageSpan = document.createElement('span');
+        messageSpan.textContent = message; // SAFE: textContent escapes HTML
+
+        // Create close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'notification-close';
+        closeBtn.type = 'button';
+        closeBtn.setAttribute('aria-label', 'Close notification');
+
+        const closeIcon = document.createElement('i');
+        closeIcon.className = 'fas fa-times';
+        closeBtn.appendChild(closeIcon);
+
+        // Assemble notification
+        content.appendChild(icon);
+        content.appendChild(messageSpan);
+        content.appendChild(closeBtn);
+        notification.appendChild(content);
+
+        // Add to body - now safe because all content is created with DOM methods
         document.body.appendChild(notification);
-        
+
         requestAnimationFrame(() => {
             notification.classList.add('show');
         });
-        
+
         setTimeout(() => this.hideNotification(notification), 4000);
-        notification.querySelector('.notification-close').addEventListener('click', () => {
+        closeBtn.addEventListener('click', () => {
             this.hideNotification(notification);
         });
-        
+
         // console.log(`Notification shown: ${type} - ${message}`);
-    }
+        }
 
     hideNotification(notification) {
         notification.classList.remove('show');

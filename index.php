@@ -136,6 +136,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
         $errorMessage = "Please fill in all required fields with valid information.";
     }
 }
+
+function getCurrentUrl() {
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $uri = $_SERVER['REQUEST_URI'] ?? '/';
+    
+    if (!preg_match('/^[a-zA-Z0-9.-]+$/', $host)) {
+        $host = 'localhost';
+    }
+    
+    $uri = substr($uri, 0, 2000);
+    
+    return htmlspecialchars($protocol . '://' . $host . $uri, ENT_QUOTES, 'UTF-8');
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -150,7 +165,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="<?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] ?>">
+    <meta property="og:url" content="<?= getCurrentUrl() ?>">
     <meta property="og:title" content="<?= htmlspecialchars($personalInfo['name']) ?> | <?= htmlspecialchars($personalInfo['title']) ?>">
     <meta property="og:description" content="<?= htmlspecialchars($personalInfo['description']) ?>">
     <meta property="og:image" content="<?= htmlspecialchars($personalInfo['profile_image']) ?>">

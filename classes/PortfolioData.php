@@ -331,15 +331,34 @@ class PortfolioData {
 
     public function updatePersonalInfo($data) {
         try {
+            $allowedFields = [
+                'name',
+                'title',
+                'subtitle',
+                'email',
+                'phone',
+                'location',
+                'birth_date',
+                'description',
+                'about_me',
+                'profile_image',
+                'resume_file'
+            ];
+            
             $updates = [];
             $params = [];
             
             foreach ($data as $field => $value) {
-                $updates[] = "$field = ?";
-                $params[] = $value;
+                if (in_array($field, $allowedFields, true)) {
+                    $updates[] = "$field = ?";
+                    $params[] = $value;
+                } else {
+                    error_log("SECURITY WARNING: Attempted to update non-whitelisted field in updatePersonalInfo: " . $field);
+                }
             }
             
             if (empty($updates)) {
+                error_log("No valid fields to update in updatePersonalInfo");
                 return false;
             }
             
@@ -710,12 +729,26 @@ class PortfolioData {
                 error_log("ID: " . $id);
                 error_log("Data received: " . print_r($data, true));
                 
-                // Build dynamic SQL
+                // FIXED: Whitelist of allowed column names to prevent SQL injection
+                $allowedFields = [
+                    'name',
+                    'title',
+                    'subtitle',
+                    'email',
+                    'phone',
+                    'location',
+                    'birth_date',
+                    'description',
+                    'about_me'
+                ];
+                
+                // Build dynamic SQL with whitelisted fields only
                 $updates = [];
                 $params = [];
                 
                 foreach ($data as $field => $value) {
-                    if ($field !== 'id') {
+                    // CRITICAL: Only allow whitelisted field names
+                    if (in_array($field, $allowedFields, true)) {
                         $updates[] = "$field = ?";
                         $params[] = $value;
                         
@@ -723,11 +756,13 @@ class PortfolioData {
                         if ($field === 'description' || $field === 'about_me') {
                             error_log("Field $field: " . substr($value, 0, 100));
                         }
+                    } else {
+                        error_log("SECURITY WARNING: Attempted to update non-whitelisted field: " . $field);
                     }
                 }
                 
                 if (empty($updates)) {
-                    error_log("No fields to update!");
+                    error_log("No valid fields to update!");
                     return false;
                 }
                 
