@@ -955,10 +955,10 @@ $currentTime = new DateTime('2025-06-28 20:12:45', new DateTimeZone('UTC'));
                             <!-- Photo Upload Form -->
                             <form method="post" enctype="multipart/form-data" id="photoUploadForm" style="display:none; margin-top:10px;">
                                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                <input type="hidden" name="action" value="update_photo">
+                                <input type="hidden" name="action" value="upload_photo">
                                 
                                 <div class="form-group" style="margin-bottom: 10px;">
-                                    <input type="file" name="photo" id="photoInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" required style="margin-bottom: 10px;">
+                                    <input type="file" name="profile_photo" id="photoInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" required style="margin-bottom: 10px;">
                                     <small style="display: block; color: #666; font-size: 12px;">Max size: 5MB. Formats: JPEG, PNG, GIF, WebP</small>
                                 </div>
                                 

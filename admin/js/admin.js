@@ -555,14 +555,20 @@ class AdminDashboard {
                 // Helper function to sanitize HTML for Quill
                 const sanitizeForQuill = (html) => {
                     if (!html) return '';
-                    // Decode HTML entities first
+                
                     const txt = document.createElement('textarea');
-                    txt.textContent = html; // Use textContent instead of innerHTML
-                    const decoded = txt.value;
+                    txt.innerHTML = html;
+                    let decoded = txt.value;
+                
+                    if (decoded.includes('&lt;') || decoded.includes('&gt;')) {
+                        txt.innerHTML = decoded;
+                        decoded = txt.value;
+                    }
                     
-                    // Create a temporary div in an isolated context
                     const temp = document.createElement('div');
-                    temp.textContent = decoded; // This prevents script execution
+                    temp.innerHTML = decoded;
+                    temp.querySelectorAll('script, iframe, object, embed').forEach(el => el.remove());
+                    
                     return temp.innerHTML;
                 };
                 
