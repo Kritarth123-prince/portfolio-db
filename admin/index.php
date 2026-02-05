@@ -28,6 +28,46 @@ function sanitizeInput($input) {
     return $input;
 }
 
+function safeDeleteFile($filePath) {
+    if (strpos($filePath, 'assets/images/') !== 0) {
+        error_log("SECURITY: Blocked deletion - not in allowed dir: " . $filePath);
+        return false;
+    }
+    
+    $sanitizedPath = str_replace(['../', '..\\', './'], '', $filePath);
+    
+    if (strpos($sanitizedPath, 'assets/images/') !== 0) {
+        error_log("SECURITY: Path traversal blocked: " . $filePath);
+        return false;
+    }
+    
+    $fullPath = '../' . $sanitizedPath;
+    
+    $realPath = realpath($fullPath);
+    $allowedRealPath = realpath('../assets/images/');
+    
+    if (!$realPath || !$allowedRealPath) {
+        return false;
+    }
+    
+    if (strpos($realPath, $allowedRealPath) !== 0) {
+        error_log("SECURITY: Real path outside allowed dir: " . $realPath);
+        return false;
+    }
+    
+    if (!is_file($realPath)) {
+        error_log("SECURITY: Not a file: " . $realPath);
+        return false;
+    }
+    
+    if (unlink($realPath)) {
+        error_log("Deleted file: " . $sanitizedPath);
+        return true;
+    }
+    
+    return false;
+}
+
 function validateCSRF($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
@@ -160,38 +200,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     
                     $fileExtension = pathinfo($uploadedFile['name'], PATHINFO_EXTENSION);
                     
-                    // SECURITY: Validate file extension against whitelist
+                    // SECURITY: Validate file extension
                     $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
                     $fileExtension = strtolower($fileExtension);
                     
                     if (!in_array($fileExtension, $allowedExtensions)) {
-                        throw new Exception("Invalid file extension. Only jpg, jpeg, png, gif, webp allowed.");
+                        throw new Exception("Invalid file extension.");
                     }
                     
                     $newFileName = 'profile_' . time() . '_' . uniqid() . '.' . $fileExtension;
                     $uploadPath = $uploadDir . $newFileName;
                     $relativePath = 'assets/images/' . $newFileName;
                     
-                    // SECURITY: Validate the relative path format before passing to database
-                    if (!preg_match('/^assets\/images\/profile_\d+_[a-f0-9]+\.(jpg|jpeg|png|gif|webp)$/', $relativePath)) {
-                        throw new Exception("Invalid file path generated.");
+                    // SECURITY: Validate path format
+                    if (!preg_match('/^assets\/images\/profile_\d+_[a-f0-9]+\.(jpg|jpeg|png|gif|webp)$/i', $relativePath)) {
+                        throw new Exception("Invalid file path.");
                     }
                     
                     if (!move_uploaded_file($uploadedFile['tmp_name'], $uploadPath)) {
                         throw new Exception("Failed to save uploaded file.");
                     }
                     
-                    // SECURITY: Only pass validated, whitelisted field to database
-                    $updateData = [];
-                    $updateData['profile_image'] = $relativePath; // Now validated
-                    
+                    $updateData = ['profile_image' => $relativePath];
                     $success = $portfolioData->updatePersonalInfo($updateData);
                     
                     if ($success) {
+                        // SECURITY FIX: Safe file deletion with multiple validations
                         if ($personalInfo['profile_image'] && 
-                            $personalInfo['profile_image'] !== $relativePath && 
-                            file_exists('../' . $personalInfo['profile_image'])) {
-                            unlink('../' . $personalInfo['profile_image']);
+                            $personalInfo['profile_image'] !== $relativePath) {
+                            
+                            // Get the old image path from database
+                            $oldImagePath = $personalInfo['profile_image'];
+                            
+                            // STEP 1: Must start with allowed directory
+                            if (strpos($oldImagePath, 'assets/images/') !== 0) {
+                                error_log("SECURITY: Blocked deletion - path not in allowed directory: " . $oldImagePath);
+                            } else {
+                                
+                                // STEP 2: Remove any path traversal attempts
+                                $sanitizedPath = str_replace(['../', '..\\', './'], '', $oldImagePath);
+                                
+                                // STEP 3: Verify it still starts with allowed directory after sanitization
+                                if (strpos($sanitizedPath, 'assets/images/') !== 0) {
+                                    error_log("SECURITY: Path traversal attempt blocked: " . $oldImagePath);
+                                } else {
+                                    
+                                    // STEP 4: Build full path
+                                    $fullPath = '../' . $sanitizedPath;
+                                    
+                                    // STEP 5: Resolve real path (follows symlinks, removes ..)
+                                    $realPath = realpath($fullPath);
+                                    $allowedRealPath = realpath('../assets/images/');
+                                    
+                                    // STEP 6: Verify real path is within allowed directory
+                                    if ($realPath && 
+                                        $allowedRealPath && 
+                                        strpos($realPath, $allowedRealPath) === 0 && 
+                                        file_exists($realPath) && 
+                                        is_file($realPath)) {
+                                        
+                                        // SAFE to delete
+                                        if (unlink($realPath)) {
+                                            error_log("Deleted old profile image: " . $sanitizedPath);
+                                        }
+                                    } else {
+                                        error_log("SECURITY: Blocked file deletion outside allowed directory: " . $oldImagePath);
+                                    }
+                                }
+                            }
                         }
                         $message = "Profile photo updated successfully!";
                     } else {

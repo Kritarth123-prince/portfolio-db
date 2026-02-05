@@ -30,10 +30,11 @@ try {
     $projects = $portfolioData->getProjects();
     $socialLinks = $portfolioData->getSocialLinks();
 } catch (Exception $e) {
+    error_log("Database Error: " . $e->getMessage());
     die("
     <div style='font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1);'>
         <h2 style='color: #e74c3c; margin-bottom: 20px;'>Database Error</h2>
-        <p style='font-size: 16px; line-height: 1.6; margin-bottom: 20px;'>" . $e->getMessage() . "</p>
+        <p style='font-size: 16px; line-height: 1.6; margin-bottom: 20px;'>Unable to connect to database. Please try again later.</p>
         <div style='background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;'>
             <h3 style='margin-top: 0; color: #333;'>Quick Fix Options:</h3>
             <a href='database_diagnostic.php' style='background: #007cba; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px; display: inline-block; margin-bottom: 10px;'>🔍 Diagnose Database</a>
@@ -67,74 +68,75 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
     $phone = htmlspecialchars(trim($_POST['phone']));
     $message = htmlspecialchars(trim($_POST['message']));
 
-    if (!empty($name) && !empty($email) && !empty($message) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $mail = new PHPMailer(true);
+    // Handle contact form submission
+    if (isset($_POST['contact_form'])) {
+        $name = trim($_POST['name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $country_code = trim($_POST['country_code'] ?? '');
+        $message = trim($_POST['message'] ?? '');
 
-        try {
-            // Email configuration from database
-            $mail->isSMTP();
-            $mail->Host = $emailConfig['smtp_host'];
-            $mail->SMTPAuth = true;
-            $mail->Username = $emailConfig['smtp_username'];
-            $mail->Password = $emailConfig['smtp_password'];
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port = $emailConfig['smtp_port'];
-
-            // Email addresses from database
-            $mail->setFrom($emailConfig['from_email'], $emailConfig['from_name']);
-            $mail->addAddress($emailConfig['to_email']);
-            $mail->addReplyTo($email, $name);
-
-            $mail->isHTML(true);
-            $mail->Subject = "New Contact from Portfolio: $name";
-            $mail->Body = "
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1);'>
-                    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;'>
-                        <h2 style='color: white; margin: 0; font-size: 24px;'>New Contact Form Submission</h2>
-                        <p style='color: #f0f0f0; margin: 10px 0 0 0;'>From your portfolio website</p>
-                    </div>
-                    <div style='padding: 30px;'>
-                        <div style='margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;'>
-                            <strong style='color: #333; display: block; margin-bottom: 5px;'>Name:</strong>
-                            <span style='color: #666; font-size: 16px;'>$name</span>
-                        </div>
-                        <div style='margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;'>
-                            <strong style='color: #333; display: block; margin-bottom: 5px;'>Email:</strong>
-                            <span style='color: #666; font-size: 16px;'>$email</span>
-                        </div>
-                        <div style='margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;'>
-                            <strong style='color: #333; display: block; margin-bottom: 5px;'>Phone:</strong>
-                            <span style='color: #666; font-size: 16px;'>$country_code $phone</span>
-                        </div>
-                        <div style='margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;'>
-                            <strong style='color: #333; display: block; margin-bottom: 10px;'>Message:</strong>
-                            <div style='color: #666; font-size: 16px; line-height: 1.6; white-space: pre-wrap;'>$message</div>
-                        </div>
-                        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
-                            <p style='color: #888; font-size: 14px; margin: 0;'>Sent from " . htmlspecialchars($personalInfo['name']) . "'s Portfolio</p>
-                            <p style='color: #888; font-size: 12px; margin: 5px 0 0 0;'>" . date('Y-m-d H:i:s') . "</p>
-                        </div>
-                    </div>
-                </div>
-            ";
+        if (!empty($name) && !empty($email) && !empty($message) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
             
-            $mail->AltBody = "New Contact Form Submission\n\nName: $name\nEmail: $email\nPhone: $country_code $phone\n\nMessage:\n$message\n\nSent from " . $personalInfo['name'] . "'s Portfolio\n" . date('Y-m-d H:i:s');
+            $mail = new PHPMailer(true);
 
-            if ($mail->send()) {
-                $_SESSION['form_success'] = true;
-                $_SESSION['form_success_time'] = time();
+            try {
+                // Server settings
+                $mail->isSMTP();
+                $mail->Host = $emailConfig['smtp_host'];
+                $mail->SMTPAuth = true;
+                $mail->Username = $emailConfig['smtp_username'];
+                $mail->Password = $emailConfig['smtp_password'];
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port = $emailConfig['smtp_port'];
+
+                // Recipients
+                $mail->setFrom($emailConfig['from_email'], $emailConfig['from_name']);
+                $mail->addAddress($emailConfig['to_email']);
                 
-                header("Location: index.php#contact");
-                exit();
-            } else {
-                $errorMessage = "Failed to send message. Please try again.";
+                // SECURITY: Sanitize all user inputs before using in email
+                $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+                $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+                $safePhone = htmlspecialchars($phone, ENT_QUOTES, 'UTF-8');
+                $safeCountryCode = htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8');
+                $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+                $safeMessage = nl2br($safeMessage);
+                
+                $mail->addReplyTo($email, $safeName);
+
+                // Content
+                $mail->isHTML(true);
+                $mail->Subject = "New Contact from Portfolio: " . $safeName;
+                $mail->Body = "
+                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                        <h2 style='color: #333;'>New Contact Form Submission</h2>
+                        <p><strong>Name:</strong> $safeName</p>
+                        <p><strong>Email:</strong> $safeEmail</p>
+                        <p><strong>Phone:</strong> $safeCountryCode $safePhone</p>
+                        <h3>Message:</h3>
+                        <p style='background: #f4f4f4; padding: 15px; border-left: 4px solid #007cba;'>$safeMessage</p>
+                        <hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>
+                        <p style='color: #666; font-size: 12px;'>Sent from " . htmlspecialchars($personalInfo['name'], ENT_QUOTES, 'UTF-8') . "'s Portfolio<br>" . date('Y-m-d H:i:s') . "</p>
+                    </div>
+                ";
+                
+                $mail->AltBody = "New Contact Form Submission\n\nName: $safeName\nEmail: $safeEmail\nPhone: $safeCountryCode $safePhone\n\nMessage:\n$message\n\nSent from " . $personalInfo['name'] . "'s Portfolio\n" . date('Y-m-d H:i:s');
+
+                if ($mail->send()) {
+                    $_SESSION['form_success'] = true;
+                    $_SESSION['form_success_time'] = time();
+                    header("Location: index.php#contact");
+                    exit();
+                } else {
+                    $errorMessage = "Failed to send message. Please try again.";
+                }
+            } catch (Exception $e) {
+                error_log("Email Error: " . $e->getMessage());
+                $errorMessage = "Failed to send message. Please try again later.";
             }
-        } catch (Exception $e) {
-            error_log("Email Error: " . $e->getMessage());
-            $errorMessage = "Failed to send message. Email configuration error.";
+        } else {
+            $errorMessage = "Please fill in all required fields with valid information.";
         }
-    } else {
-        $errorMessage = "Please fill in all required fields with valid information.";
     }
 }
 

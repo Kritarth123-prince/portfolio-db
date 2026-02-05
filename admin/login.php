@@ -1,126 +1,108 @@
 <?php
 session_start();
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
-// require_once __DIR__ . '/../config/database.php';
-require_once '../config/database.php';
-
+// Redirect if already logged in
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
     header("Location: index.php");
     exit;
 }
 
+require_once '../classes/PortfolioData.php';
+
+$loginError = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     
-    if (!empty($username) && !empty($password)) {
+    // Basic validation
+    if (empty($username) || empty($password)) {
+        $loginError = 'Please enter both username and password.';
+    } else {
         try {
-            $database = new Database();
-            $conn = $database->connect();
+            $portfolioData = new PortfolioData();
             
-            $stmt = $conn->prepare("SELECT id, username, password_hash, email, is_active, last_login FROM admin_users WHERE username = ? AND is_active = 1");
+            // Prepared statement to prevent SQL injection
+            $stmt = $portfolioData->pdo->prepare("SELECT * FROM admin_users WHERE username = ? LIMIT 1");
             $stmt->execute([$username]);
-
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user && password_verify($password, $user['password_hash'])) {
+            $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Verify password
+            if ($admin && password_verify($password, $admin['password'])) {
+                // Regenerate session ID to prevent session fixation
+                session_regenerate_id(true);
+                
+                // Set session variables
                 $_SESSION['admin_logged_in'] = true;
-                $_SESSION['admin_login_time'] = time();
-                $_SESSION['admin_user'] = $user['username'];
-                $_SESSION['admin_user_id'] = $user['id'];
-                $_SESSION['admin_email'] = $user['email'];
-
-                $updateStmt = $conn->prepare("UPDATE admin_users SET last_login = NOW() WHERE id = ?");
-                $updateStmt->execute([$user['id']]);
-
+                $_SESSION['admin_user'] = $admin['username'];
+                $_SESSION['admin_id'] = $admin['id'];
+                
+                // Redirect to admin panel
                 header("Location: index.php");
                 exit;
             } else {
-                $loginError = "Invalid username or password. Please try again.";
+                // SECURITY: Generic error - don't reveal if username or password is wrong
+                $loginError = 'Invalid username or password.';
+                
+                // Log failed attempt for security monitoring
+                error_log("Failed login attempt for username: " . $username . " from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
             }
-           
+            
         } catch (PDOException $e) {
-            error_log("Login Error: " . $e->getMessage());
-            // $loginError = "An error occurred. Please try again later.";
-            $loginError = "PDO Error: " . $e->getMessage();
+            // SECURITY: Log database error, show generic message
+            error_log("Database error during login: " . $e->getMessage());
+            $loginError = 'System unavailable. Please try again later.';
+            
+        } catch (Exception $e) {
+            // SECURITY: Log any other error, show generic message
+            error_log("Login error: " . $e->getMessage());
+            $loginError = 'Login failed. Please try again.';
         }
-    } else {
-        $loginError = "Please enter both username and password.";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio Admin - Login</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/login.css">
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
+<body class="login-page">
     <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <div class="logo">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <h2>Admin Login</h2>
-                <p>Access Portfolio Management System</p>
-            </div>
+        <div class="login-box">
+            <h1><i class="fas fa-lock"></i> Admin Login</h1>
             
-            <?php if (isset($loginError)): ?>
+            <?php if (!empty($loginError)): ?>
                 <div class="error-message">
                     <i class="fas fa-exclamation-triangle"></i>
                     <span><?= htmlspecialchars($loginError) ?></span>
                 </div>
             <?php endif; ?>
             
-            <form method="POST" class="login-form">
+            <form method="POST" action="">
                 <div class="form-group">
-                    <div class="input-wrapper">
-                        <i class="fas fa-user input-icon"></i>
-                        <input type="text" name="username" placeholder="Username" required value="<?= isset($_POST['username']) ? htmlspecialchars($_POST['username']) : '' ?>" class="form-input">
-                    </div>
+                    <label for="username">
+                        <i class="fas fa-user"></i> Username
+                    </label>
+                    <input type="text" id="username" name="username" required autofocus>
                 </div>
+                
                 <div class="form-group">
-                    <div class="input-wrapper">
-                        <i class="fas fa-lock input-icon"></i>
-                        <input type="password" name="password" placeholder="Password" required class="form-input">
-                        <button type="button" class="password-toggle" onclick="togglePassword()">
-                            <i class="fas fa-eye" id="toggleIcon"></i>
-                        </button>
-                    </div>
+                    <label for="password">
+                        <i class="fas fa-key"></i> Password
+                    </label>
+                    <input type="password" id="password" name="password" required>
                 </div>
-                <button type="submit" class="login-btn">
-                    <span class="btn-text">Login to Dashboard</span>
-                    <i class="fas fa-arrow-right btn-icon"></i>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Login
                 </button>
             </form>
-            
-            <div class="login-footer">
-                <p>Portfolio CMS v1.0</p>
-                <div class="social-links">
-                    <a href="https://github.com/Kritarth123-prince" target="_blank" title="GitHub">
-                        <i class="fab fa-github"></i>
-                    </a>
-                    <a href="https://www.linkedin.com/in/kritarth-ranjan" target="_blank" title="LinkedIn">
-                        <i class="fab fa-linkedin"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="background-animation">
-            <div class="floating-shape shape-1"></div>
-            <div class="floating-shape shape-2"></div>
-            <div class="floating-shape shape-3"></div>
-            <div class="floating-shape shape-4"></div>
         </div>
     </div>
-
-    <script src="js/login.js"></script>
 </body>
 </html>
