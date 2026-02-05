@@ -131,53 +131,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
 
                 $mail->addReplyTo($safeEmail, $safeName);
 
-                // Content
-                $mail->isHTML(true);
+                // SECURITY: Use plain text email to eliminate injection risk
+                $mail->isHTML(false);  // ✅ No HTML = No injection
                 $mail->Subject = "New Contact: " . $safeName;
 
-                // SECURITY: Build template WITHOUT user variables first
-                $emailTemplate = '
-                <!DOCTYPE html>
-                <html>
-                <head><meta charset="UTF-8"></head>
-                <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px;">
-                    <div style="max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 20px;">
-                        <h2 style="color: #333; margin-top: 0;">New Contact Form Submission</h2>
-                        <table style="width: 100%; background: white; padding: 15px;">
-                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Name:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">NAME_PLACEHOLDER</td></tr>
-                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Email:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">EMAIL_PLACEHOLDER</td></tr>
-                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Phone:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">PHONE_PLACEHOLDER</td></tr>
-                        </table>
-                        <div style="background: white; padding: 15px; margin-top: 15px;">
-                            <strong>Message:</strong>
-                            <div style="background: #f4f4f4; padding: 15px; margin-top: 10px; white-space: pre-wrap; word-wrap: break-word;">MESSAGE_PLACEHOLDER</div>
-                        </div>
-                        <p style="color: #666; font-size: 12px; text-align: center; margin-top: 20px;">FOOTER_PLACEHOLDER</p>
-                    </div>
-                </body>
-                </html>';
-
-                // SECURITY: Replace placeholders with sanitized content (breaks taint flow)
-                $mail->Body = str_replace(
-                    ['NAME_PLACEHOLDER', 'EMAIL_PLACEHOLDER', 'PHONE_PLACEHOLDER', 'MESSAGE_PLACEHOLDER', 'FOOTER_PLACEHOLDER'],
-                    [
-                        htmlspecialchars($safeName, ENT_QUOTES, 'UTF-8'),
-                        htmlspecialchars($safeEmail, ENT_QUOTES, 'UTF-8'),
-                        htmlspecialchars($safeCountryCode . ' ' . $safePhone, ENT_QUOTES, 'UTF-8'),
-                        htmlspecialchars(strip_tags($message), ENT_QUOTES, 'UTF-8'),  // Double sanitize
-                        htmlspecialchars('Sent from ' . $personalInfo['name'] . '\'s Portfolio | ' . date('Y-m-d H:i:s'), ENT_QUOTES, 'UTF-8')
-                    ],
-                    $emailTemplate
-                );
-
-                // Plain text alternative
-                $mail->AltBody = "NEW CONTACT FORM SUBMISSION\n\n"
-                    . "Name: " . $safeName . "\n"
-                    . "Email: " . $safeEmail . "\n"
-                    . "Phone: " . $safeCountryCode . " " . $safePhone . "\n\n"
-                    . "Message:\n" . strip_tags($message) . "\n\n"
-                    . "Sent from " . $personalInfo['name'] . "'s Portfolio\n"
-                    . date('Y-m-d H:i:s');
+                // Build plain text body (no HTML parsing possible)
+                $mail->Body = "═══════════════════════════════════════\n";
+                $mail->Body .= "   NEW CONTACT FORM SUBMISSION\n";
+                $mail->Body .= "═���═════════════════════════════════════\n\n";
+                $mail->Body .= "Name:     " . $safeName . "\n";
+                $mail->Body .= "Email:    " . $safeEmail . "\n";
+                $mail->Body .= "Phone:    " . $safeCountryCode . " " . $safePhone . "\n\n";
+                $mail->Body .= "MESSAGE:\n";
+                $mail->Body .= "───────────────────────────────────────\n";
+                $mail->Body .= strip_tags($message) . "\n";  // Remove ALL HTML tags
+                $mail->Body .= "───────────────────────────────────────\n\n";
+                $mail->Body .= "Sent from: " . $personalInfo['name'] . "'s Portfolio\n";
+                $mail->Body .= "Date/Time: " . date('Y-m-d H:i:s') . "\n";
+                $mail->Body .= "═══════════════════════════════════════\n";
 
                 if ($mail->send()) {
                     $_SESSION['form_success'] = true;
