@@ -51,6 +51,29 @@ $dob = new DateTime($personalInfo['birth_date']);
 $today = new DateTime();
 $age = $today->diff($dob)->y;
 
+function sanitizeForEmail($input, $type = 'text') {
+    switch ($type) {
+        case 'email':
+            $sanitized = filter_var($input, FILTER_SANITIZE_EMAIL);
+            return filter_var($sanitized, FILTER_VALIDATE_EMAIL) ? $sanitized : '';
+            
+        case 'phone':
+            return preg_replace('/[^0-9+\-() ]/', '', $input);
+            
+        case 'message':
+            // Remove ALL HTML tags
+            $sanitized = strip_tags($input);
+            // Escape HTML entities
+            $sanitized = htmlspecialchars($sanitized, ENT_QUOTES, 'UTF-8');
+            // Convert line breaks to <br> safely
+            return nl2br($sanitized, false);
+            
+        case 'text':
+        default:
+            return htmlspecialchars(strip_tags($input), ENT_QUOTES, 'UTF-8');
+    }
+}
+
 // Contact form handling - SIMPLIFIED LOGIC
 if (isset($_SESSION['form_success_time']) && (time() - $_SESSION['form_success_time']) > 5) {
     unset($_SESSION['form_success']);
@@ -93,34 +116,48 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
                 // Recipients
                 $mail->setFrom($emailConfig['from_email'], $emailConfig['from_name']);
                 $mail->addAddress($emailConfig['to_email']);
-                
-                // SECURITY: Sanitize all user inputs before using in email
-                $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
-                $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
-                $safePhone = htmlspecialchars($phone, ENT_QUOTES, 'UTF-8');
-                $safeCountryCode = htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8');
-                $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
-                $safeMessage = nl2br($safeMessage);
-                
-                $mail->addReplyTo($email, $safeName);
+
+                // SECURITY: Comprehensive sanitization
+                $safeName = sanitizeForEmail($name, 'text');
+                $safeEmail = sanitizeForEmail($email, 'email');
+                $safePhone = sanitizeForEmail($phone, 'phone');
+                $safeCountryCode = sanitizeForEmail($country_code, 'phone');
+                $safeMessage = sanitizeForEmail($message, 'message');
+
+                // Validate email
+                if (empty($safeEmail)) {
+                    throw new Exception("Invalid email address.");
+                }
+
+                $mail->addReplyTo($safeEmail, $safeName);
 
                 // Content
                 $mail->isHTML(true);
-                $mail->Subject = "New Contact from Portfolio: " . $safeName;
+                $mail->Subject = "New Contact: " . $safeName;
                 $mail->Body = "
-                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                        <h2 style='color: #333;'>New Contact Form Submission</h2>
-                        <p><strong>Name:</strong> $safeName</p>
-                        <p><strong>Email:</strong> $safeEmail</p>
-                        <p><strong>Phone:</strong> $safeCountryCode $safePhone</p>
-                        <h3>Message:</h3>
-                        <p style='background: #f4f4f4; padding: 15px; border-left: 4px solid #007cba;'>$safeMessage</p>
-                        <hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>
-                        <p style='color: #666; font-size: 12px;'>Sent from " . htmlspecialchars($personalInfo['name'], ENT_QUOTES, 'UTF-8') . "'s Portfolio<br>" . date('Y-m-d H:i:s') . "</p>
-                    </div>
+                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                    <h2 style='color: #333;'>New Contact Form Submission</h2>
+                    <p><strong>Name:</strong> $safeName</p>
+                    <p><strong>Email:</strong> $safeEmail</p>
+                    <p><strong>Phone:</strong> $safeCountryCode $safePhone</p>
+                    <h3>Message:</h3>
+                    <div style='background: #f4f4f4; padding: 15px; border-left: 4px solid #007cba;'>$safeMessage</div>
+                    <hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>
+                    <p style='color: #666; font-size: 12px;'>Sent from " . htmlspecialchars($personalInfo['name'], ENT_QUOTES, 'UTF-8') . "'s Portfolio<br>" . date('Y-m-d H:i:s') . "</p>
+                </div>
                 ";
-                
-                $mail->AltBody = "New Contact Form Submission\n\nName: $safeName\nEmail: $safeEmail\nPhone: $safeCountryCode $safePhone\n\nMessage:\n$message\n\nSent from " . $personalInfo['name'] . "'s Portfolio\n" . date('Y-m-d H:i:s');
+
+                $mail->AltBody = "New Contact Form Submission
+
+                Name: $safeName
+                Email: $safeEmail
+                Phone: $safeCountryCode $safePhone
+
+                Message:
+                " . strip_tags($safeMessage) . "
+
+                Sent from " . $personalInfo['name'] . "'s Portfolio
+                " . date('Y-m-d H:i:s');
 
                 if ($mail->send()) {
                     $_SESSION['form_success'] = true;
