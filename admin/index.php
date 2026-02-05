@@ -655,10 +655,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     
     if (empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-        $redirectUrl = $_SERVER['PHP_SELF'];
+        $redirectUrl = 'index.php';
+        
         if (isset($alertMessage)) {
-            $redirectUrl .= "?alert=" . urlencode($alertMessage) . "&type=" . $alertType;
+            $validTypes = ['success', 'error', 'warning', 'info'];
+            $safeAlertType = in_array($alertType, $validTypes, true) ? $alertType : 'info';
+            
+            $queryParams = [
+                'alert' => $alertMessage,
+                'type' => $safeAlertType
+            ];
+            $redirectUrl .= '?' . http_build_query($queryParams);
         }
+        
+        if (!preg_match('/^index\.php(\?.*)?$/', $redirectUrl)) {
+            error_log("SECURITY WARNING: Invalid redirect URL blocked: " . $redirectUrl);
+            $redirectUrl = 'index.php';
+        }
+        
         header("Location: " . $redirectUrl);
         exit;
     }
