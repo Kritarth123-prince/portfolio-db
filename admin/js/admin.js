@@ -491,26 +491,66 @@ class AdminDashboard {
         
         const formHTML = this.getEditFormHTML(itemType, itemData);
         
-        modal.innerHTML = `
-            <div class="modal-overlay"></div>
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-edit"></i> Edit ${this.getDisplayName(itemType)}</h3>
-                    <button class="modal-close" type="button" aria-label="Close modal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    ${formHTML}
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary modal-cancel" type="button">Cancel</button>
-                    <button class="btn btn-primary modal-save" type="button">
-                        <i class="fas fa-save"></i> Save Changes
-                    </button>
-                </div>
-            </div>
-        `;
+        // FIXED: Create elements safely instead of using innerHTML
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        
+        const content = document.createElement('div');
+        content.className = 'modal-content';
+        
+        // Create header
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+        
+        const h3 = document.createElement('h3');
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-edit';
+        h3.appendChild(icon);
+        h3.appendChild(document.createTextNode(' Edit ' + this.getDisplayName(itemType)));
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'modal-close';
+        closeBtn.type = 'button';
+        closeBtn.setAttribute('aria-label', 'Close modal');
+        const closeIcon = document.createElement('i');
+        closeIcon.className = 'fas fa-times';
+        closeBtn.appendChild(closeIcon);
+        
+        header.appendChild(h3);
+        header.appendChild(closeBtn);
+        
+        // Create body - formHTML is already escaped by escapeHtml()
+        const body = document.createElement('div');
+        body.className = 'modal-body';
+        body.innerHTML = formHTML; // Safe because all data is escaped in getEditFormHTML
+        
+        // Create footer
+        const footer = document.createElement('div');
+        footer.className = 'modal-footer';
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary modal-cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = 'Cancel';
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn btn-primary modal-save';
+        saveBtn.type = 'button';
+        const saveIcon = document.createElement('i');
+        saveIcon.className = 'fas fa-save';
+        saveBtn.appendChild(saveIcon);
+        saveBtn.appendChild(document.createTextNode(' Save Changes'));
+        
+        footer.appendChild(cancelBtn);
+        footer.appendChild(saveBtn);
+        
+        // Assemble modal
+        content.appendChild(header);
+        content.appendChild(body);
+        content.appendChild(footer);
+        
+        modal.appendChild(overlay);
+        modal.appendChild(content);
         
         return modal;
     }
