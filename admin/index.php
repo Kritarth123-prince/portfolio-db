@@ -137,18 +137,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         try {
             switch ($_POST['action']) {
-                case 'update_photo':
-                    if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+                case 'upload_photo':
+                    if (!isset($_FILES['profile_photo']) || $_FILES['profile_photo']['error'] !== UPLOAD_ERR_OK) {
                         throw new Exception("No photo uploaded or upload error occurred.");
                     }
                     
-                    $uploadedFile = $_FILES['photo'];
-                    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                    $maxSize = 5 * 1024 * 1024;
+                    $uploadedFile = $_FILES['profile_photo'];
+                    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
                     
-                    if (!in_array($uploadedFile['type'], $allowedTypes)) {
-                        throw new Exception("Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.");
+                    if (!in_array(strtolower($uploadedFile['type']), $allowedTypes)) {
+                        throw new Exception("Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.");
                     }
+                    
+                    $maxSize = 5 * 1024 * 1024; // 5MB
                     
                     if ($uploadedFile['size'] > $maxSize) {
                         throw new Exception("File too large. Please upload an image smaller than 5MB.");
@@ -160,15 +161,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                     
                     $fileExtension = pathinfo($uploadedFile['name'], PATHINFO_EXTENSION);
+                    
+                    // SECURITY: Validate file extension against whitelist
+                    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                    $fileExtension = strtolower($fileExtension);
+                    
+                    if (!in_array($fileExtension, $allowedExtensions)) {
+                        throw new Exception("Invalid file extension. Only jpg, jpeg, png, gif, webp allowed.");
+                    }
+                    
                     $newFileName = 'profile_' . time() . '_' . uniqid() . '.' . $fileExtension;
                     $uploadPath = $uploadDir . $newFileName;
                     $relativePath = 'assets/images/' . $newFileName;
+                    
+                    // SECURITY: Validate the relative path format before passing to database
+                    if (!preg_match('/^assets\/images\/profile_\d+_[a-f0-9]+\.(jpg|jpeg|png|gif|webp)$/', $relativePath)) {
+                        throw new Exception("Invalid file path generated.");
+                    }
                     
                     if (!move_uploaded_file($uploadedFile['tmp_name'], $uploadPath)) {
                         throw new Exception("Failed to save uploaded file.");
                     }
                     
-                    $success = $portfolioData->updatePersonalInfo(['profile_image' => $relativePath]);
+                    // SECURITY: Only pass validated, whitelisted field to database
+                    $updateData = [];
+                    $updateData['profile_image'] = $relativePath; // Now validated
+                    
+                    $success = $portfolioData->updatePersonalInfo($updateData);
                     
                     if ($success) {
                         if ($personalInfo['profile_image'] && 
@@ -520,24 +539,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 case 'update_personal_info':
                     $itemId = (int)$_POST['item_id'];
                     
-                    // Get HTML content WITHOUT any escaping or sanitization
+                    // Validate item ID
+                    if ($itemId <= 0) {
+                        throw new Exception("Invalid item ID.");
+                    }
+                    
+                    // SECURITY: Define allowed fields for personal info update
+                    $allowedFields = [
+                        'name', 'title', 'subtitle', 'email', 
+                        'phone', 'location', 'birth_date', 
+                        'description', 'about_me'
+                    ];
+                    
+                    // Get HTML content WITHOUT escaping (for rich text editor)
                     $description = $_POST['description'] ?? '';
                     $aboutMe = $_POST['about_me'] ?? '';
+                    
+                    // SECURITY: Validate that description and about_me are strings
+                    if (!is_string($description) || !is_string($aboutMe)) {
+                        throw new Exception("Invalid data type for description or about_me.");
+                    }
                     
                     error_log("Raw description received: " . substr($description, 0, 100));
                     error_log("Raw about_me received: " . substr($aboutMe, 0, 100));
                     
-                    $data = [
-                        'name' => sanitizeInput($_POST['name'] ?? ''),
-                        'title' => sanitizeInput($_POST['title'] ?? ''),
-                        'subtitle' => sanitizeInput($_POST['subtitle'] ?? ''),
-                        'email' => filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL) ?: '',
-                        'phone' => sanitizeInput($_POST['phone'] ?? ''),
-                        'location' => sanitizeInput($_POST['location'] ?? ''),
-                        'birth_date' => $_POST['birth_date'] ?? '',
-                        'description' => $description,    // NO SANITIZATION!
-                        'about_me' => $aboutMe            // NO SANITIZATION!
-                    ];
+                    // SECURITY: Build data array with validated fields only
+                    $data = [];
+                    
+                    // Add simple fields with sanitization
+                    if (isset($_POST['name'])) {
+                        $data['name'] = sanitizeInput($_POST['name']);
+                    }
+                    if (isset($_POST['title'])) {
+                        $data['title'] = sanitizeInput($_POST['title']);
+                    }
+                    if (isset($_POST['subtitle'])) {
+                        $data['subtitle'] = sanitizeInput($_POST['subtitle']);
+                    }
+                    if (isset($_POST['email'])) {
+                        $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
+                        if ($email === false) {
+                            throw new Exception("Invalid email format.");
+                        }
+                        $data['email'] = $email;
+                    }
+                    if (isset($_POST['phone'])) {
+                        $data['phone'] = sanitizeInput($_POST['phone']);
+                    }
+                    if (isset($_POST['location'])) {
+                        $data['location'] = sanitizeInput($_POST['location']);
+                    }
+                    if (isset($_POST['birth_date'])) {
+                        // Validate date format
+                        $birthDate = $_POST['birth_date'];
+                        if (!empty($birthDate) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthDate)) {
+                            throw new Exception("Invalid birth date format.");
+                        }
+                        $data['birth_date'] = $birthDate;
+                    }
+                    
+                    // Add HTML fields (validated as strings, not sanitized)
+                    if (!empty($description)) {
+                        $data['description'] = $description;
+                    }
+                    if (!empty($aboutMe)) {
+                        $data['about_me'] = $aboutMe;
+                    }
+                    
+                    // SECURITY: Verify all fields in $data are in the whitelist
+                    foreach (array_keys($data) as $field) {
+                        if (!in_array($field, $allowedFields, true)) {
+                            error_log("SECURITY WARNING: Attempted to update non-whitelisted field: " . $field);
+                            unset($data[$field]);
+                        }
+                    }
+                    
+                    if (empty($data)) {
+                        throw new Exception("No valid fields to update.");
+                    }
                     
                     $success = $portfolioData->updatePersonalInfoById($itemId, $data);
                     break;
