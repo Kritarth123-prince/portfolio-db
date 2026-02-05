@@ -729,35 +729,35 @@ class PortfolioData {
                 error_log("ID: " . $id);
                 error_log("Data received: " . print_r($data, true));
                 
-                // FIXED: Whitelist of allowed column names to prevent SQL injection
+                // SECURITY FIX: Define allowed fields as a static whitelist
+                // This prevents SQL injection by using hardcoded field names
                 $allowedFields = [
-                    'name',
-                    'title',
-                    'subtitle',
-                    'email',
-                    'phone',
-                    'location',
-                    'birth_date',
-                    'description',
-                    'about_me'
+                    'name' => 'name',
+                    'title' => 'title',
+                    'subtitle' => 'subtitle',
+                    'email' => 'email',
+                    'phone' => 'phone',
+                    'location' => 'location',
+                    'birth_date' => 'birth_date',
+                    'description' => 'description',
+                    'about_me' => 'about_me'
                 ];
                 
-                // Build dynamic SQL with whitelisted fields only
+                // Build SQL using hardcoded field names, not user input
                 $updates = [];
                 $params = [];
                 
-                foreach ($data as $field => $value) {
-                    // CRITICAL: Only allow whitelisted field names
-                    if (in_array($field, $allowedFields, true)) {
-                        $updates[] = "$field = ?";
-                        $params[] = $value;
+                foreach ($allowedFields as $safeFieldName => $columnName) {
+                    // Check if this field exists in the data
+                    if (array_key_exists($safeFieldName, $data)) {
+                        // Use the hardcoded column name, NOT the user-provided key
+                        $updates[] = $columnName . " = ?";
+                        $params[] = $data[$safeFieldName];
                         
                         // Log HTML content fields
-                        if ($field === 'description' || $field === 'about_me') {
-                            error_log("Field $field: " . substr($value, 0, 100));
+                        if ($safeFieldName === 'description' || $safeFieldName === 'about_me') {
+                            error_log("Field " . $safeFieldName . ": " . substr($data[$safeFieldName], 0, 100));
                         }
-                    } else {
-                        error_log("SECURITY WARNING: Attempted to update non-whitelisted field: " . $field);
                     }
                 }
                 
@@ -768,6 +768,7 @@ class PortfolioData {
                 
                 $params[] = $id;
                 
+                // SQL is built from hardcoded strings only
                 $sql = "UPDATE personal_info SET " . implode(', ', $updates) . " WHERE id = ?";
                 error_log("SQL: " . $sql);
                 
