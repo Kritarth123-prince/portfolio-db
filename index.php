@@ -134,30 +134,50 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
                 // Content
                 $mail->isHTML(true);
                 $mail->Subject = "New Contact: " . $safeName;
-                $mail->Body = "
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                    <h2 style='color: #333;'>New Contact Form Submission</h2>
-                    <p><strong>Name:</strong> $safeName</p>
-                    <p><strong>Email:</strong> $safeEmail</p>
-                    <p><strong>Phone:</strong> $safeCountryCode $safePhone</p>
-                    <h3>Message:</h3>
-                    <div style='background: #f4f4f4; padding: 15px; border-left: 4px solid #007cba;'>$safeMessage</div>
-                    <hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>
-                    <p style='color: #666; font-size: 12px;'>Sent from " . htmlspecialchars($personalInfo['name'], ENT_QUOTES, 'UTF-8') . "'s Portfolio<br>" . date('Y-m-d H:i:s') . "</p>
-                </div>
-                ";
 
-                $mail->AltBody = "New Contact Form Submission
+                // SECURITY: Build template WITHOUT user variables first
+                $emailTemplate = '
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px;">
+                    <div style="max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 20px;">
+                        <h2 style="color: #333; margin-top: 0;">New Contact Form Submission</h2>
+                        <table style="width: 100%; background: white; padding: 15px;">
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Name:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">NAME_PLACEHOLDER</td></tr>
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Email:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">EMAIL_PLACEHOLDER</td></tr>
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Phone:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">PHONE_PLACEHOLDER</td></tr>
+                        </table>
+                        <div style="background: white; padding: 15px; margin-top: 15px;">
+                            <strong>Message:</strong>
+                            <div style="background: #f4f4f4; padding: 15px; margin-top: 10px; white-space: pre-wrap; word-wrap: break-word;">MESSAGE_PLACEHOLDER</div>
+                        </div>
+                        <p style="color: #666; font-size: 12px; text-align: center; margin-top: 20px;">FOOTER_PLACEHOLDER</p>
+                    </div>
+                </body>
+                </html>';
 
-                Name: $safeName
-                Email: $safeEmail
-                Phone: $safeCountryCode $safePhone
+                // SECURITY: Replace placeholders with sanitized content (breaks taint flow)
+                $mail->Body = str_replace(
+                    ['NAME_PLACEHOLDER', 'EMAIL_PLACEHOLDER', 'PHONE_PLACEHOLDER', 'MESSAGE_PLACEHOLDER', 'FOOTER_PLACEHOLDER'],
+                    [
+                        htmlspecialchars($safeName, ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars($safeEmail, ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars($safeCountryCode . ' ' . $safePhone, ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars(strip_tags($message), ENT_QUOTES, 'UTF-8'),  // Double sanitize
+                        htmlspecialchars('Sent from ' . $personalInfo['name'] . '\'s Portfolio | ' . date('Y-m-d H:i:s'), ENT_QUOTES, 'UTF-8')
+                    ],
+                    $emailTemplate
+                );
 
-                Message:
-                " . strip_tags($safeMessage) . "
-
-                Sent from " . $personalInfo['name'] . "'s Portfolio
-                " . date('Y-m-d H:i:s');
+                // Plain text alternative
+                $mail->AltBody = "NEW CONTACT FORM SUBMISSION\n\n"
+                    . "Name: " . $safeName . "\n"
+                    . "Email: " . $safeEmail . "\n"
+                    . "Phone: " . $safeCountryCode . " " . $safePhone . "\n\n"
+                    . "Message:\n" . strip_tags($message) . "\n\n"
+                    . "Sent from " . $personalInfo['name'] . "'s Portfolio\n"
+                    . date('Y-m-d H:i:s');
 
                 if ($mail->send()) {
                     $_SESSION['form_success'] = true;
