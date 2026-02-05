@@ -120,9 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         exit;
         
     } catch (Exception $e) {
-        http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
-        exit;
+        sendErrorResponse('Failed to retrieve item data. Please try again.', $e);
     }
 }
 
@@ -638,18 +636,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
         } catch (Exception $e) {
-            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-                header('Content-Type: application/json');
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-                exit;
-            }
+            $safeMessage = 'An error occurred while processing your request.';
+            error_log("Form error: " . $e->getMessage());
             
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                sendErrorResponse($safeMessage, $e, 400);
+            }
             $success = false;
-            $message = $e->getMessage();
-            error_log("Form submission error: " . $e->getMessage());
+            $message = $safeMessage;
         }
-        
+
         $alertType = $success ? 'success' : 'error';
         $alertMessage = $message;
     }

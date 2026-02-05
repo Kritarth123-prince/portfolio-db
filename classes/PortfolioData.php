@@ -8,8 +8,9 @@ class PortfolioData {
         $database = new Database();
         $this->pdo = $database->connect(); // Changed from $conn to $pdo
         
-        if ($this->pdo === null) {
-            die("Database connection failed. Please check your database configuration and ensure the database server is running.");
+         if ($this->pdo === null) {
+            error_log("Database connection failed");
+            die("Database connection failed. Please contact support.");
         }
     }
     
@@ -18,7 +19,7 @@ class PortfolioData {
         try {
             $tableCheck = $this->pdo->query("SHOW TABLES LIKE 'email_config'");
             if ($tableCheck->rowCount() == 0) {
-                throw new Exception("Table 'email_config' does not exist. Please run the database setup script to create the required tables.");
+                throw new Exception("Table 'email_config' does not exist.");
             }
             
             $query = "SELECT * FROM email_config ORDER BY id DESC LIMIT 1";
@@ -27,14 +28,16 @@ class PortfolioData {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$result) {
-                throw new Exception("No email configuration found in database. Please add email settings through the admin panel or run: INSERT INTO email_config (smtp_username, smtp_password, from_email, to_email) VALUES ('your_email@gmail.com', 'your_app_password', 'your_email@gmail.com', 'recipient@gmail.com');");
+                throw new Exception("No email configuration found in database.");
             }
             
             return $result;
         } catch (PDOException $e) {
-            die("Database Error in getEmailConfig(): " . $e->getMessage() . "<br><br>Please check:<br>1. Database connection<br>2. email_config table exists<br>3. Proper database permissions");
+            error_log("Database Error in getEmailConfig(): " . $e->getMessage());
+            die("Unable to load email configuration. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getEmailConfig(): " . $e->getMessage());
+            die("Unable to load email configuration. Please contact support.");
         }
     }
 
@@ -43,7 +46,7 @@ class PortfolioData {
         try {
             $tableCheck = $this->pdo->query("SHOW TABLES LIKE 'personal_info'");
             if ($tableCheck->rowCount() == 0) {
-                throw new Exception("Table 'personal_info' does not exist. Please run the database setup script to create the required tables.");
+                throw new Exception("Table 'personal_info' does not exist.");
             }
             
             $query = "SELECT * FROM personal_info ORDER BY id DESC LIMIT 1";
@@ -52,14 +55,16 @@ class PortfolioData {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$result) {
-                throw new Exception("No personal information found in database. Please add personal information through the admin panel or run the population script.");
+                throw new Exception("No personal information found in database.");
             }
             
             return $result;
         } catch (PDOException $e) {
-            die("Database Error in getPersonalInfo(): " . $e->getMessage() . "<br><br>Please check:<br>1. Database connection<br>2. personal_info table exists<br>3. Data has been populated<br>4. Proper database permissions");
+            error_log("Database Error in getPersonalInfo(): " . $e->getMessage());
+            die("Unable to load personal information. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getPersonalInfo(): " . $e->getMessage());
+            die("Unable to load personal information. Please contact support.");
         }
     }
     
@@ -82,9 +87,11 @@ class PortfolioData {
             
             return $result;
         } catch (PDOException $e) {
-            die("Database Error in getSkillCategories(): " . $e->getMessage() . "<br><br>Please check the skill_categories table and database connection.");
+            error_log("Database Error in getSkillCategories(): " . $e->getMessage());
+            die("Unable to load skill categories. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getSkillCategories(): " . $e->getMessage());
+            die("Unable to load skill categories. Please contact support.");
         }
     }
     
@@ -102,9 +109,11 @@ class PortfolioData {
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            die("Database Error in getSkillsByCategory(): " . $e->getMessage() . "<br><br>Please check the skills table and database connection.");
+            error_log("Database Error in getSkillsByCategory(): " . $e->getMessage());
+            die("Unable to load skills by category. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getSkillsByCategory(): " . $e->getMessage());
+            die("Unable to load skills by category. Please contact support.");
         }
     }
     
@@ -116,7 +125,8 @@ class PortfolioData {
             }
             return $categories;
         } catch (Exception $e) {
-            die("Error in getAllSkillsGrouped(): " . $e->getMessage());
+            error_log("Error in getAllSkillsGrouped(): " . $e->getMessage());
+            die("Unable to load skills. Please contact support.");
         }
     }
     
@@ -133,9 +143,11 @@ class PortfolioData {
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            die("Database Error in getResearchPapers(): " . $e->getMessage() . "<br><br>Please check the research_papers table and database connection.");
+            error_log("Database Error in getResearchPapers(): " . $e->getMessage());
+            die("Unable to load research papers. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getResearchPapers(): " . $e->getMessage());
+            die("Unable to load research papers. Please contact support.");
         }
     }
     
@@ -160,9 +172,11 @@ class PortfolioData {
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            die("Database Error in getExperiences(): " . $e->getMessage() . "<br><br>Please check the experiences table and database connection.");
+            error_log("Database Error in getExperiences(): " . $e->getMessage());
+            die("Unable to load experiences. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getExperiences(): " . $e->getMessage());
+            die("Unable to load experiences. Please contact support.");
         }
     }
     
@@ -184,9 +198,11 @@ class PortfolioData {
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            die("Database Error in getProjects(): " . $e->getMessage() . "<br><br>Please check the projects table and database connection.");
+            error_log("Database Error in getProjects(): " . $e->getMessage());
+            die("Unable to load projects. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getProjects(): " . $e->getMessage());
+            die("Unable to load projects. Please contact support.");
         }
     }
     
@@ -203,9 +219,11 @@ class PortfolioData {
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            die("Database Error in getSocialLinks(): " . $e->getMessage() . "<br><br>Please check the social_links table and database connection.");
+            error_log("Database Error in getSocialLinks(): " . $e->getMessage());
+            die("Unable to load social links. Please contact support.");
         } catch (Exception $e) {
-            die("Error: " . $e->getMessage());
+            error_log("Error in getSocialLinks(): " . $e->getMessage());
+            die("Unable to load social links. Please contact support.");
         }
     }
     

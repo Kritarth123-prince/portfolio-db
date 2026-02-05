@@ -123,7 +123,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['contact_form'])) {
             if ($mail->send()) {
                 $_SESSION['form_success'] = true;
                 $_SESSION['form_success_time'] = time();
-                header("Location: " . $_SERVER['PHP_SELF'] . "#contact");
+                
+                header("Location: index.php#contact");
                 exit();
             } else {
                 $errorMessage = "Failed to send message. Please try again.";
@@ -604,7 +605,8 @@ function getCurrentUrl() {
                         </div>
                     <?php endif; ?>
 
-                    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>#contact" method="POST" style="<?php echo $formDisabled ? 'display:none;' : 'display:block;' ?>">
+                    <!-- <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>#contact" method="POST" style="<?php echo $formDisabled ? 'display:none;' : 'display:block;' ?>"> -->
+                    <form action="#contact" method="POST">
                         <input type="hidden" name="contact_form" value="1">
                         <div class="form-group">
                             <input type="text" name="name" placeholder="Your Name" required>
