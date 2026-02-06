@@ -80,7 +80,7 @@ if (isset($_SESSION['form_success_time']) && (time() - $_SESSION['form_success_t
     unset($_SESSION['form_success_time']);
 }
 
-$messageSent = isset($_SESSION['form_success']) ? $_SESSION['form_success'] : false;
+$messageSent = isset($_SESSION['form_success']);
 $formDisabled = $messageSent && (time() - $_SESSION['form_success_time']) <= 5;
 
 // Process contact form submission
@@ -629,14 +629,20 @@ function getCurrentUrl() {
                 </div>
 
                 <div class="contact-form">
-                    <?php if ($messageSent && !$formDisabled): ?>
-                        <div class="form-success">
-                            <p>Thank you for your message! I'll get back to you soon.</p>
-                        </div>
+                    <?php if ($messageSent): ?>
+                    <div class="form-success" id="successMsg">
+                        <p>Thank you for your message! I'll get back to you soon.</p>
+                    </div>
+                    <script>
+                        // Auto-hide success message and show form after 5 seconds
+                        setTimeout(function() {
+                            document.getElementById('successMsg').style.display = 'none';
+                            document.getElementById('contactForm').style.display = 'block';
+                        }, 5000);
+                    </script>
                     <?php endif; ?>
 
-                    <!-- <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>#contact" method="POST" style="<?php echo $formDisabled ? 'display:none;' : 'display:block;' ?>"> -->
-                    <form action="#contact" method="POST">
+                    <form id="contactForm" action="#contact" method="POST" style="<?= $messageSent ? 'display:none;' : '' ?>">
                         <input type="hidden" name="contact_form" value="1">
                         <div class="form-group">
                             <input type="text" name="name" placeholder="Your Name" required>
@@ -653,19 +659,6 @@ function getCurrentUrl() {
                         </div>
                         <button type="submit" class="btn btn-primary">Send Message</button>
                     </form>
-
-                    <?php if ($formDisabled): ?>
-                        <div class="form-success">
-                            <p>Thank you for your message! I'll get back to you soon.</p>
-                        </div>
-                        <script>
-                            // Show form after 5 seconds
-                            setTimeout(function() {
-                                document.querySelector('.contact-form form').style.display = 'block';
-                                document.querySelector('.contact-form .form-success').style.display = 'none';
-                            }, 5000);
-                        </script>
-                    <?php endif; ?>
                 </div>
             </div>
         </section>
